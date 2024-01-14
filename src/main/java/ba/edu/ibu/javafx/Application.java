@@ -33,8 +33,14 @@ import java.io.IOException;
 public class Application extends javafx.application.Application {
     @Override
     public void start(Stage stage) throws IOException {
+
         FXMLLoader fxmlLoader = new FXMLLoader(Application.class.getResource("login.fxml"));
         Scene scene = new Scene(fxmlLoader.load(), 800, 500);
+
+
+        LoginController loginController = fxmlLoader.getController();
+        UserService userService = new UserService();
+        loginController.setUserService(userService);
         stage.setTitle("Users");
         stage.setScene(scene);
         stage.show();

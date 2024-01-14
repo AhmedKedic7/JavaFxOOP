@@ -1,7 +1,10 @@
 package ba.edu.ibu.javafx;
 
+
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
+import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
 import javafx.fxml.FXML;
 import javafx.fxml.Initializable;
 import javafx.scene.control.*;
@@ -9,11 +12,15 @@ import javafx.scene.control.cell.PropertyValueFactory;
 import javafx.scene.input.MouseEvent;
 
 import java.net.URL;
+import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.Locale;
 import java.util.ResourceBundle;
 
 public class ListController implements Initializable {
+    private DatabaseConnection databaseConnection;
+    @FXML
+    private TableView<Student> studentTableView;
     @FXML
     public TextField txtId;
     @FXML
@@ -38,13 +45,100 @@ public class ListController implements Initializable {
     public TableColumn<Student, String> colYear;
     @FXML
     public Button btnSave;
-    ObservableList<Student> students = FXCollections.observableArrayList(
-            Arrays.asList(
-                    new Student(1, "Becir", "Isakovic", "1", "1"),
-                    new Student(2, "Bekir", "Ishakovic", "2", "2")
-            )
-    );
-    int selectedIndex;
+    @FXML
+    private TextField filterField;
+
+    ObservableList<Student> listM;
+    ObservableList<Student> dataList;
+
+    int selectedIndex = -1;
+
+    StudentService studentService = new StudentService();
+
+    public void saveStudent() {
+        try {
+            int studentId = Integer.valueOf(txtId.getText());
+            String name = txtName.getText();
+            String surname = txtSurname.getText();
+            String year = txtYear.getText();
+            String cycle = txtCycle.getText();
+
+            Student student = new Student(studentId, name, surname, year, cycle);
+
+            if (studentService.isDuplicateId(studentId)) {
+                // Update existing student
+                studentService.saveStudent(student);
+            } else {
+                // Add new student
+                studentService.saveStudent(student);
+            }
+
+            UpdateTable();
+            searchStudent();
+        } catch (NumberFormatException e) {
+            showError("Invalid attribute", "You have to populate all fields");
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    @FXML
+    void getStudent(MouseEvent event) {
+        selectedIndex = tblStudents.getSelectionModel().getSelectedIndex();
+        if (selectedIndex <= -1) return;
+
+        txtId.setText(String.valueOf(colId.getCellData(selectedIndex)));
+        txtName.setText(colName.getCellData(selectedIndex));
+        txtSurname.setText(colSurname.getCellData(selectedIndex));
+        txtYear.setText(colYear.getCellData(selectedIndex));
+        txtCycle.setText(colCycle.getCellData(selectedIndex));
+    }
+
+    public void UpdateTable() throws SQLException {
+        colId.setCellValueFactory(new PropertyValueFactory<>("id"));
+        colName.setCellValueFactory(new PropertyValueFactory<>("name"));
+        colSurname.setCellValueFactory(new PropertyValueFactory<>("surname"));
+        colYear.setCellValueFactory(new PropertyValueFactory<>("year"));
+        colCycle.setCellValueFactory(new PropertyValueFactory<>("cycle"));
+
+        listM = databaseConnection.getStudents();
+        tblStudents.setItems(listM);
+    }
+
+    @FXML
+    void searchStudent() {
+        colId.setCellValueFactory(new PropertyValueFactory<>("id"));
+        colName.setCellValueFactory(new PropertyValueFactory<>("name"));
+        colSurname.setCellValueFactory(new PropertyValueFactory<>("surname"));
+        colYear.setCellValueFactory(new PropertyValueFactory<>("year"));
+        colCycle.setCellValueFactory(new PropertyValueFactory<>("cycle"));
+
+        dataList = studentService.getStudents();
+        tblStudents.setItems(dataList);
+
+        FilteredList<Student> filteredData = new FilteredList<>(dataList, b -> true);
+
+        filterField.textProperty().addListener((observable, oldValue, newValue) -> {
+            filteredData.setPredicate(student -> {
+                if (newValue == null || newValue.isEmpty()) {
+                    return true;
+                }
+                String lowerCaseFilter = newValue.toLowerCase();
+
+                return String.valueOf(student.getId()).toLowerCase().contains(lowerCaseFilter)
+                        || student.getName().toLowerCase().contains(lowerCaseFilter)
+                        || student.getSurname().toLowerCase().contains(lowerCaseFilter)
+                        || student.getYear().toLowerCase().contains(lowerCaseFilter)
+                        || student.getCycle().toLowerCase().contains(lowerCaseFilter);
+            });
+        });
+
+        SortedList<Student> sortedData = new SortedList<>(filteredData);
+        sortedData.comparatorProperty().bind(tblStudents.comparatorProperty());
+        tblStudents.setItems(sortedData);
+    }
+
+
 
     static void showError(String title, String message) {
         Locale.setDefault(Locale.ENGLISH);
@@ -54,61 +148,17 @@ public class ListController implements Initializable {
         error.show();
     }
 
-    @FXML
-    void getStudent(MouseEvent event) {
-        selectedIndex = tblStudents.getSelectionModel().getSelectedIndex();
-        if (selectedIndex <= -1) return;
 
-        txtId.setText(colId.getCellData(selectedIndex).toString());
-        txtName.setText(colName.getCellData(selectedIndex));
-        txtSurname.setText(colSurname.getCellData(selectedIndex));
-        txtYear.setText(colYear.getCellData(selectedIndex));
-        txtCycle.setText(colCycle.getCellData(selectedIndex));
-    }
 
-    @FXML
-    void saveStudent() {
-        Student tempStudent = null;
-        if (tblStudents.getSelectionModel() != null) {
-            selectedIndex = tblStudents.getSelectionModel().getSelectedIndex();
-            if (colId.getCellData(selectedIndex) != null) {
-                for (int i = 0; i < students.size(); i++) {
-                    if (students.get(i).getId() == colId.getCellData(selectedIndex)) {
-                        tempStudent = new Student(Integer.valueOf(txtId.getText()), txtName.getText(), txtSurname.getText(), txtYear.getText(), txtCycle.getText());
-                        students.set(i, tempStudent);
-                    }
-                }
-                tblStudents.refresh();
-            } else {
-                try {
-                    if (txtId.getText().equals("") || txtName.getText().equals("") || txtSurname.getText().equals("") || txtYear.getText().equals("") || txtCycle.getText().equals("")) {
-                        showError("Invalid attribute", "You have to populate all fields");
-                    } else {
-                        students.add(new Student(Integer.valueOf(txtId.getText()), txtName.getText(), txtSurname.getText(), txtYear.getText(), txtCycle.getText()));
-                    }
-                } catch (NumberFormatException e) {
-                    showError("Invalid attribute", "You have to populate all fields");
-                }
-            }
-        }
-    }
+
 
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
         initializeTable();
     }
 
-    public void initializeTable() {
-        colId.setCellValueFactory(new PropertyValueFactory<>("id"));
-        colName.setCellValueFactory(new PropertyValueFactory<>("name"));
-        colSurname.setCellValueFactory(new PropertyValueFactory<>("surname"));
-        colYear.setCellValueFactory(new PropertyValueFactory<>("year"));
-        colCycle.setCellValueFactory(new PropertyValueFactory<>("cycle"));
-        reinitializeTable();
+    private void initializeTable() {
     }
 
-    public void reinitializeTable() {
-        tblStudents.setItems(students);
-    }
 
 }

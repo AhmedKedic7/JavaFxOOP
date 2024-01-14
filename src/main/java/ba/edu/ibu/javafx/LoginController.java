@@ -8,11 +8,15 @@ import javafx.scene.Node;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
 import javafx.scene.control.Button;
+import javafx.scene.control.PasswordField;
+import javafx.scene.control.TextField;
 import javafx.stage.Stage;
 
 import java.io.IOException;
 import java.net.URL;
 import java.util.ResourceBundle;
+
+import static ba.edu.ibu.javafx.ListController.showError;
 
 public class LoginController implements Initializable {
     @FXML
@@ -20,11 +24,8 @@ public class LoginController implements Initializable {
     private Parent root;
     private Stage stage;
     private Scene scene;
+    private UserService userService;
 
-    @FXML
-    void login(ActionEvent event) throws IOException {
-        switchToStudentsScreen(event);
-    }
 
     void switchToStudentsScreen(ActionEvent event) throws IOException {
         root = FXMLLoader.load(getClass().getResource("students.fxml"));
@@ -37,5 +38,33 @@ public class LoginController implements Initializable {
     @Override
     public void initialize(URL url, ResourceBundle resourceBundle) {
 
+    }
+    @FXML
+    private TextField usernameField;
+    @FXML
+    private PasswordField passwordField;
+
+    @FXML
+    void login(ActionEvent event) throws IOException {
+
+        if (authenticateUser()) {
+            switchToStudentsScreen(event);
+        } else {
+            showError("Login Failed", "Invalid credentials. Please try again.");
+        }
+    }
+
+    private boolean authenticateUser() {
+        String enteredUsername = usernameField.getText();
+        String enteredPassword = passwordField.getText();
+
+        // Use UserService to authenticate the user
+        User authenticatedUser = UserService.authenticateUser(enteredUsername, enteredPassword);
+
+        // Return true if authentication is successful, false otherwise
+        return authenticatedUser != null;
+    }
+    public void setUserService(UserService userService) {
+        this.userService = userService;
     }
 }
